@@ -3,8 +3,9 @@
 Env-agnostic: works wherever sgl.Engine constructs (Modal container OR a GPU
 pod). Launchers just call run_all(); nothing here knows about Modal.
 
-Flow (1 launch): gates first -> abort if any fail -> then the deliverable
-matrix (outer=lag needs a fresh engine; inner=dataset x temp reuses it).
+Cost discipline: run_all loads EVERY dataset up front (CPU) before any engine,
+so a dataset bug fails before a single GPU-second is spent. gates run before the
+matrix; a gate failure aborts the matrix.
 """
 from __future__ import annotations
 
@@ -26,14 +27,14 @@ def run_cell(engine, prompt_list: "list[str]", temp: float) -> "list[dict]":
     return outs
 
 
-# ---------------- gates ----------------
+# ---------------- gates (take preloaded prompts; build engines AFTER) ----------------
 
-def gate_depth0_parity() -> dict:
+def gate_depth0_parity(prompts_by_ds: "dict[str, list[str]]") -> dict:
     """lag=0 (guarded off == vanilla) must be clearly speculating -> confirms the
     harness/wiring didn't break spec. Records the A10G fresh anchor."""
+    pl = prompts_by_ds["gsm8k"][: config.LOSSLESS_N_PROMPTS]
     engine = eng.build_dspark_engine(lag_steps=0, max_running_requests=config.BS_PRIMARY)
     try:
-        pl = pr.load_prompts("gsm8k", n=config.LOSSLESS_N_PROMPTS)
         metas = [o["meta_info"] for o in run_cell(engine, pl, temp=0.0)]
         acc = metrics.mean_accept_length_incl_bonus(metas)
     finally:
@@ -47,12 +48,12 @@ def gate_depth0_parity() -> dict:
     }
 
 
-def gate_losslessness() -> dict:
+def gate_losslessness(prompts_by_ds: "dict[str, list[str]]") -> dict:
     """temp=0: stale-DSpark output_ids must equal target-only greedy, token for
     token. Lossless by construction (verify untouched) -- a mismatch is a BUG in
     the injection, not a staleness effect. Engines run sequentially (24GB A10G
     can't hold target-only + target+draft at once)."""
-    pl = pr.load_prompts("gsm8k", n=config.LOSSLESS_N_PROMPTS)
+    pl = prompts_by_ds["gsm8k"][: config.LOSSLESS_N_PROMPTS]
     ref = eng.build_target_only_engine()
     try:
         ref_ids = [o["output_ids"] for o in run_cell(ref, pl, temp=0.0)]
@@ -67,11 +68,11 @@ def gate_losslessness() -> dict:
     return {"gate": "losslessness", "ok": len(mism) == 0, "n": len(pl), "mismatch_idx": mism}
 
 
-def gate_keying() -> dict:
+def gate_keying(prompts_by_ds: "dict[str, list[str]]") -> dict:
     """bs>1 forces batch reorder; the rid-keyed cache must give the same accept
     length as bs=1. A gap => keying is cross-wiring requests (the peer's bs=1
     harness never tested this)."""
-    pl = pr.load_prompts("gsm8k", n=config.N_PROMPTS)
+    pl = prompts_by_ds["gsm8k"]
     lag = max(1, config.LAGS[-1])
     out = {}
     for tag, bs in (("bs1", config.BS_PRIMARY), ("bsN", config.BS_KEYING)):
@@ -86,20 +87,21 @@ def gate_keying() -> dict:
             "bs1": out["bs1"], "bsN": out["bsN"], "diff": diff, "tol": config.KEYING_TOL}
 
 
-def run_gates() -> "list[dict]":
-    return [gate_depth0_parity(), gate_losslessness(), gate_keying()]
+def run_gates(prompts_by_ds: "dict[str, list[str]]") -> "list[dict]":
+    return [gate_depth0_parity(prompts_by_ds),
+            gate_losslessness(prompts_by_ds),
+            gate_keying(prompts_by_ds)]
 
 
 # ---------------- deliverable matrix ----------------
 
-def run_matrix(results_dir: Path) -> dict:
+def run_matrix(results_dir: Path, prompts_by_ds: "dict[str, list[str]]") -> dict:
     all_summ = {}
     for lag in config.LAGS:                              # outer: fresh engine per lag
         engine = eng.build_dspark_engine(lag_steps=lag, max_running_requests=config.BS_PRIMARY)
         try:
             for dataset, temp in itertools.product(config.DATASETS, config.TEMPS):
-                pl = pr.load_prompts(dataset)
-                metas = [o["meta_info"] for o in run_cell(engine, pl, temp)]
+                metas = [o["meta_info"] for o in run_cell(engine, prompts_by_ds[dataset], temp)]
                 key = f"lag{lag}__{dataset}__t{temp}"
                 all_summ[key] = {"lag": lag, "dataset": dataset, "temp": temp,
                                  **metrics.summarize_cell(metas)}
@@ -119,7 +121,9 @@ def run_matrix(results_dir: Path) -> dict:
 def run_all(results_dir: str = "results", gates_only: bool = False) -> dict:
     rd = Path(results_dir)
     rd.mkdir(parents=True, exist_ok=True)
-    gates = run_gates()
+    # CPU-cheap: load EVERY dataset up front, so a dataset bug fails before any GPU.
+    prompts_by_ds = {d: pr.load_prompts(d) for d in config.DATASETS}
+    gates = run_gates(prompts_by_ds)
     (rd / "gates.json").write_text(json.dumps(gates, indent=2))
     failed = [g["gate"] for g in gates if not g["ok"]]
     if failed:
@@ -128,5 +132,5 @@ def run_all(results_dir: str = "results", gates_only: bool = False) -> dict:
         )
     if gates_only:
         return {"gates": gates, "summary": None}
-    summary = run_matrix(rd)
+    summary = run_matrix(rd, prompts_by_ds)
     return {"gates": gates, "summary": summary}

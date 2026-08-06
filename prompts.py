@@ -28,10 +28,12 @@ def load_prompts(
     from datasets import load_dataset  # HF library (installed in the image)
 
     if dataset == "gsm8k":
-        ds = load_dataset("gsm8k", "main", split="test")
+        # bare "gsm8k" is rejected by recent datasets/hf_hub -> must be namespaced.
+        # "main" config is required (a "socratic" config also exists).
+        ds = load_dataset("openai/gsm8k", "main", split="test")
         prompts = [ex["question"] for ex in ds]
     elif dataset == "humaneval":
-        ds = load_dataset("openai_humaneval", split="test")
+        ds = load_dataset("openai/openai_humaneval", split="test")
         prompts = [ex["prompt"] for ex in ds]
     elif dataset == "mt_bench":
         # multi-turn; use the first turn as a single-shot prompt
@@ -40,3 +42,17 @@ def load_prompts(
     else:
         raise ValueError(f"unknown dataset {dataset!r}; expected one of {config.DATASETS}")
     return _pick(prompts, n, seed)
+
+
+def validate_all(n: int = 2) -> None:
+    """CPU-only, no GPU: confirm every dataset loads and the field access yields
+    non-empty strings. Run locally (FREE) before ever touching Modal, and in the
+    CPU download step so a dataset bug fails BEFORE any GPU is allocated:
+
+        cd ssd-stale-poc && python -c "import prompts; prompts.validate_all()"
+    """
+    for d in config.DATASETS:
+        got = load_prompts(d, n=n)
+        assert got and all(isinstance(p, str) and p for p in got), f"{d}: bad prompts {got!r}"
+        print(f"  {d}: OK ({len(got)} prompts, first={got[0][:60]!r})")
+    print("all datasets OK")

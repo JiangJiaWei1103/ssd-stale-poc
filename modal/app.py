@@ -62,10 +62,19 @@ app = modal.App("ssd-stale-poc")
 
 @app.function(image=image, volumes={HF_CACHE: hf_vol}, timeout=3600, cpu=4.0, memory=16384)
 def download_models():
+    """CPU only ($0 GPU). Pre-warms model + dataset cache AND validates every
+    dataset loads -- so a dataset bug fails HERE, and run_bench (GPU) never
+    spins up for a dataset typo."""
+    import sys
+
     from huggingface_hub import snapshot_download
 
     for repo in ("Qwen/Qwen3-4B", "deepseek-ai/dspark_qwen3_4b_block7"):
         snapshot_download(repo)
+    sys.path.insert(0, "/root/harness")
+    import prompts
+
+    prompts.validate_all()   # loads + caches all 3 datasets on CPU
     hf_vol.commit()
 
 
