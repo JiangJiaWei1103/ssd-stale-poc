@@ -46,7 +46,15 @@ MEM_FRACTION_STATIC = 0.8
 BASELINE_ACCEPT_LENGTH = 4.07            # RunPod Step-0 fresh anchor (incl bonus); re-anchored on A10G
 PARITY_MIN_ACCEPT = 2.5                  # lag=0 must be clearly speculating (harness didn't break spec)
 KEYING_TOL = 0.15                        # |bs>1 mean_correct - bs1| tolerance
-LOSSLESS_N_PROMPTS = 8                   # a handful suffices for the greedy-match gate
+LOSSLESS_N_PROMPTS = 8                   # a handful suffices for the prefix-agreement gate
+# Losslessness gate compares fresh(lag0) vs stale(lagmax) greedy output_ids and
+# measures the shared-prefix length. It does NOT demand bitwise equality: at
+# temp=0 a single FP near-tie argmax flip permanently diverges the tail (benign,
+# see the graph-eager-diff / standalone-dp finding). A REAL injection bug corrupts
+# verify and diverges EARLY+systematically -> tiny median shared prefix. This
+# floor only trips on gross breakage; subtle corruption is the accuracy-parity
+# SHOULD's job. PROVISIONAL -- recalibrate against the first real distribution.
+LOSSLESS_MEDIAN_PREFIX_MIN = 8           # fail only if median shared prefix < this (gross-breakage floor)
 
 
 @dataclass(frozen=True)
