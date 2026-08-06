@@ -34,8 +34,11 @@ image = (
     .pip_install("hf_transfer", "huggingface_hub", "datasets", "matplotlib")
     # ship the LOCAL branch (environ.py edit + dspark_hidden_lag_cache.py) INTO the image.
     # copy=True is REQUIRED so the pip install -e (a build step) sees these files.
+    # remote_path must NOT be basename "sglang": /root is on sys.path (app.py lives
+    # there), so a dir literally named /root/sglang would shadow the installed
+    # package as an empty PEP-420 namespace package. Ship to /root/sglang_src.
     .add_local_dir(
-        LOCAL_SGLANG, remote_path="/root/sglang", copy=True,
+        LOCAL_SGLANG, remote_path="/root/sglang_src", copy=True,
         ignore=[".git", ".git/**", "**/__pycache__/**", "**/*.pyc",
                 "**/*.so", "**/*.dylib", "**/target/**", "**/node_modules/**",
                 "docs/**", ".venv/**", "**/.pytest_cache/**"],
@@ -45,7 +48,7 @@ image = (
         # sgl-kernel: prebuilt wheel, --no-deps (Dockerfile cu13 branch)
         "python -m pip install --no-deps sglang-kernel==0.4.5",
         # editable install of the branch; cu130 extra-index supplies torch 2.11 for CUDA 13
-        f'python -m pip install --extra-index-url {TORCH_CU} -e "/root/sglang/python"',
+        f'python -m pip install --extra-index-url {TORCH_CU} -e "/root/sglang_src/python"',
     )
     # ship the harness (importable at runtime; not needed at build time -> copy=False)
     .add_local_dir(
@@ -75,10 +78,13 @@ def run_bench(gates_only: bool = False):
     import subprocess
     import sys
 
-    # sgl-kernel sm_86 smoke test -- fail fast if the fatbin lacks Ampere SASS.
+    # smoke test: sgl-kernel loads on sm_86 AND `import sglang` resolves to the
+    # installed editable package (not a shadowing namespace dir) with .Engine.
     subprocess.run(
         [sys.executable, "-c",
-         "import sgl_kernel, torch; print('sgl_kernel OK', torch.cuda.get_device_name())"],
+         "import sgl_kernel, torch, sglang; "
+         "print('sgl_kernel OK', torch.cuda.get_device_name(), '| sglang', sglang.__file__); "
+         "assert hasattr(sglang, 'Engine'), 'sglang.Engine missing -- namespace shadowing?'"],
         check=True,
     )
     sys.path.insert(0, "/root/harness")
