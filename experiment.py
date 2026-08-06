@@ -116,7 +116,7 @@ def run_matrix(results_dir: Path) -> dict:
     return all_summ
 
 
-def run_all(results_dir: str = "results") -> dict:
+def run_all(results_dir: str = "results", gates_only: bool = False) -> dict:
     rd = Path(results_dir)
     rd.mkdir(parents=True, exist_ok=True)
     gates = run_gates()
@@ -126,5 +126,7 @@ def run_all(results_dir: str = "results") -> dict:
         raise RuntimeError(
             f"gates failed: {failed} -- fix before trusting the matrix (results/gates.json)"
         )
+    if gates_only:
+        return {"gates": gates, "summary": None}
     summary = run_matrix(rd)
     return {"gates": gates, "summary": summary}

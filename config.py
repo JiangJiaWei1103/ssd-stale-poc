@@ -21,7 +21,12 @@ LAGS = [0, 1, 2, 3]                      # lag=0 == vanilla; extend {4,6,8} if n
 DATASETS = ["gsm8k", "mt_bench", "humaneval"]   # easy / hard / code (mirror the peer's 3)
 TEMPS = [0.0, 1.0]                       # greedy (smoothest) + sampling (context reversal)
 
-N_PROMPTS = 32                           # per dataset (mirror the peer's 32 x 3 = 96)
+# per dataset. NOTE: accept length is a PER-STEP metric -- each 256-token gen is
+# ~256/accept ~= 60 decode steps, so N prompts ~= N*60 step-samples per cell (64
+# -> ~4000). That's why this is far below the ~200 used for per-PROMPT accuracy
+# parity (different unit). Bootstrap CIs (metrics.bootstrap_ci, resampled over
+# prompts) make precision explicit; bump if a CI is too wide (cost is trivial).
+N_PROMPTS = 64
 MAX_NEW_TOKENS = 256                     # mirror the peer harness
 
 # fixed seeds => fresh and stale runs see identical prompts (fair comparison)

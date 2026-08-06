@@ -21,16 +21,45 @@ reported, not excluded (see docs/, and the user's "fallback fresh 可以丟掉")
 from __future__ import annotations
 
 
-def pool_histograms(metas: "list[dict]") -> "list[int]":
-    """Element-wise sum of per-request spec_correct_drafts_histogram."""
+def _hists(metas: "list[dict]") -> "list[list[int]]":
+    return [m.get("spec_correct_drafts_histogram") or [] for m in metas]
+
+
+def _pool(hists: "list[list[int]]") -> "list[int]":
     pooled: "list[int]" = []
-    for m in metas:
-        h = m.get("spec_correct_drafts_histogram") or []
+    for h in hists:
         if len(h) > len(pooled):
             pooled += [0] * (len(h) - len(pooled))
         for k, c in enumerate(h):
             pooled[k] += int(c)
     return pooled
+
+
+def pool_histograms(metas: "list[dict]") -> "list[int]":
+    """Element-wise sum of per-request spec_correct_drafts_histogram."""
+    return _pool(_hists(metas))
+
+
+def bootstrap_ci(metas: "list[dict]", n_boot: int = 1000, seed: int = 0,
+                 ci: float = 0.95) -> dict:
+    """CI on mean_correct_drafts, resampled over REQUESTS (prompts) -- this is
+    the honest interval: it respects the correlation between decode steps within
+    one prompt (the reason N=64 prompts != 64*60 independent samples)."""
+    import random
+
+    hists = _hists(metas)
+    n = len(hists)
+    if n == 0:
+        return {"lo": 0.0, "hi": 0.0}
+    rng = random.Random(seed)
+    means = [
+        mean_correct_drafts(_pool([hists[rng.randrange(n)] for _ in range(n)]))
+        for _ in range(n_boot)
+    ]
+    means.sort()
+    lo = means[int((1 - ci) / 2 * n_boot)]
+    hi = means[min(n_boot - 1, int((1 + ci) / 2 * n_boot))]
+    return {"lo": lo, "hi": hi}
 
 
 def mean_correct_drafts(pooled: "list[int]") -> float:
@@ -53,6 +82,7 @@ def summarize_cell(metas: "list[dict]") -> dict:
         "n_requests": len(metas),
         "total_steps": sum(pooled),
         "mean_correct_drafts": mean_correct_drafts(pooled),          # PRIMARY (no bonus)
+        "ci95": bootstrap_ci(metas),                                 # honest interval (over prompts)
         "accept_length_incl_bonus": mean_accept_length_incl_bonus(metas),  # cross-check
         "correct_drafts_histogram": pooled,                          # index k = #steps w/ k correct
     }

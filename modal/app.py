@@ -71,7 +71,7 @@ def download_models():
     volumes={HF_CACHE: hf_vol, OUT_DIR: out_vol},
     timeout=3 * 3600, memory=32768, max_containers=1,
 )
-def run_bench():
+def run_bench(gates_only: bool = False):
     import subprocess
     import sys
 
@@ -84,11 +84,11 @@ def run_bench():
     sys.path.insert(0, "/root/harness")
     from experiment import run_all
 
-    run_all(results_dir=OUT_DIR)
+    run_all(results_dir=OUT_DIR, gates_only=gates_only)
     out_vol.commit()
 
 
 @app.local_entrypoint()
-def main():
+def main(gates_only: bool = False):
     download_models.remote()
-    run_bench.remote()
+    run_bench.remote(gates_only=gates_only)
