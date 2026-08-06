@@ -135,17 +135,40 @@ def run_gates(prompts_by_ds: "dict[str, list[str]]") -> "list[dict]":
 
 # ---------------- deliverable matrix ----------------
 
-def run_matrix(results_dir: Path, prompts_by_ds: "dict[str, list[str]]") -> dict:
+def run_matrix(results_dir: Path, prompts_by_ds: "dict[str, list[str]]",
+               on_cell_done=None) -> dict:
+    """Crash-safe: (1) RESUME -- a finished cell's {key}.json is reused, so a
+    re-run after a crash skips everything already paid for (a fully-done lag skips
+    its engine build too). (2) DURABILITY -- on_cell_done() fires after every cell
+    (the Modal launcher wires it to Volume.commit, so a hard kill mid-matrix keeps
+    completed cells). (3) ISOLATION -- one bad cell writes {key}.error.json and the
+    rest keep running instead of aborting the whole sweep."""
     all_summ = {}
     for lag in config.LAGS:                              # outer: fresh engine per lag
+        pending = []
+        for dataset, temp in itertools.product(config.DATASETS, config.TEMPS):
+            key = f"lag{lag}__{dataset}__t{temp}"
+            fp = results_dir / f"{key}.json"
+            if fp.exists():
+                all_summ[key] = json.loads(fp.read_text())    # resume: reuse a finished cell
+            else:
+                pending.append((dataset, temp, key))
+        if not pending:
+            continue                                          # lag fully cached -> skip engine build
         engine = eng.build_dspark_engine(lag_steps=lag, max_running_requests=config.BS_PRIMARY)
         try:
-            for dataset, temp in itertools.product(config.DATASETS, config.TEMPS):
-                metas = [o["meta_info"] for o in run_cell(engine, prompts_by_ds[dataset], temp)]
-                key = f"lag{lag}__{dataset}__t{temp}"
-                all_summ[key] = {"lag": lag, "dataset": dataset, "temp": temp,
-                                 **metrics.summarize_cell(metas)}
-                (results_dir / f"{key}.json").write_text(json.dumps(all_summ[key], indent=2))
+            for dataset, temp, key in pending:
+                try:
+                    metas = [o["meta_info"] for o in run_cell(engine, prompts_by_ds[dataset], temp)]
+                    cell = {"lag": lag, "dataset": dataset, "temp": temp,
+                            **metrics.summarize_cell(metas)}
+                    (results_dir / f"{key}.json").write_text(json.dumps(cell, indent=2))
+                    all_summ[key] = cell
+                except Exception as e:                        # isolate: a bad cell can't kill the rest
+                    (results_dir / f"{key}.error.json").write_text(repr(e))
+                finally:
+                    if on_cell_done:
+                        on_cell_done()                        # persist after each cell (Volume.commit)
         finally:
             engine.shutdown()
     for s in all_summ.values():                          # ratio vs fresh (lag=0)
@@ -158,13 +181,16 @@ def run_matrix(results_dir: Path, prompts_by_ds: "dict[str, list[str]]") -> dict
     return all_summ
 
 
-def run_all(results_dir: str = "results", gates_only: bool = False) -> dict:
+def run_all(results_dir: str = "results", gates_only: bool = False,
+            on_cell_done=None) -> dict:
     rd = Path(results_dir)
     rd.mkdir(parents=True, exist_ok=True)
     # CPU-cheap: load EVERY dataset up front, so a dataset bug fails before any GPU.
     prompts_by_ds = {d: pr.load_prompts(d) for d in config.DATASETS}
     gates = run_gates(prompts_by_ds)
     (rd / "gates.json").write_text(json.dumps(gates, indent=2))
+    if on_cell_done:
+        on_cell_done()                                   # persist gates.json before the long matrix
     failed = [g["gate"] for g in gates if not g["ok"]]
     if failed:
         raise RuntimeError(
@@ -172,5 +198,5 @@ def run_all(results_dir: str = "results", gates_only: bool = False) -> dict:
         )
     if gates_only:
         return {"gates": gates, "summary": None}
-    summary = run_matrix(rd, prompts_by_ds)
+    summary = run_matrix(rd, prompts_by_ds, on_cell_done=on_cell_done)
     return {"gates": gates, "summary": summary}

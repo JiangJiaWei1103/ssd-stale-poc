@@ -99,8 +99,14 @@ def run_bench(gates_only: bool = False):
     sys.path.insert(0, "/root/harness")
     from experiment import run_all
 
-    run_all(results_dir=OUT_DIR, gates_only=gates_only)
-    out_vol.commit()
+    # on_cell_done=out_vol.commit -> results persist to the Volume after EVERY
+    # cell, so a hard kill (OOM/timeout) mid-matrix keeps what's done. The finally
+    # commit covers ordinary exceptions. A re-run then RESUMES (run_matrix skips
+    # any cell whose {key}.json already landed on the Volume) -- no GPU re-paid.
+    try:
+        run_all(results_dir=OUT_DIR, gates_only=gates_only, on_cell_done=out_vol.commit)
+    finally:
+        out_vol.commit()
 
 
 @app.local_entrypoint()
