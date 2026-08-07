@@ -11,12 +11,19 @@ import os
 import config
 
 
-def build_dspark_engine(lag_steps: int, max_running_requests: int = config.BS_PRIMARY):
-    """DSpark spec decoding with staleness = lag_steps (0 == vanilla)."""
+def build_dspark_engine(
+    lag_steps: int,
+    max_running_requests: int = config.BS_PRIMARY,
+    fill_mode: "str | None" = None,
+):
+    """DSpark spec decoding with staleness = lag_steps rounds (0 == vanilla).
+    fill_mode picks the variant-C frontier fill (repeat/gap/self_kv) when lag>=1;
+    None -> config.FILL_MODE."""
     import sglang as sgl
 
-    os.environ[config.LAG_ENV] = str(lag_steps)          # spawned scheduler inherits this
-    os.environ["SGLANG_RAGGED_VERIFY_MODE"] = "static"   # pin verify-all (no budget confound)
+    os.environ[config.LAG_ENV] = str(lag_steps)                     # spawned scheduler inherits this
+    os.environ["SGLANG_RAGGED_VERIFY_MODE"] = "static"             # pin verify-all (no budget confound)
+    os.environ[config.STALE_FILL_ENV] = fill_mode or config.FILL_MODE
     kwargs = dict(
         model_path=config.TARGET_MODEL,
         speculative_algorithm="DSPARK",

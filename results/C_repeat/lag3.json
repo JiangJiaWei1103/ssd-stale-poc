@@ -1,0 +1,22 @@
+{
+  "lag": 3,
+  "fill": "repeat",
+  "n_requests": 64,
+  "total_steps": 9750,
+  "mean_correct_drafts": 0.6792820512820513,
+  "ci95": {
+    "lo": 0.6212706908514224,
+    "hi": 0.7524308152580403
+  },
+  "accept_length_incl_bonus": 1.7626068419380005,
+  "correct_drafts_histogram": [
+    6874,
+    1440,
+    603,
+    268,
+    157,
+    119,
+    73,
+    216
+  ]
+}

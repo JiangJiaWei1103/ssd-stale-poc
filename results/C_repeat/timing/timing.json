@@ -1,0 +1,18 @@
+{
+  "n_prompts": 8,
+  "n_decode_steps_used": 247,
+  "t_draft_ms_median": 5.4323,
+  "t_verify_ms_median": 19.7632,
+  "t_draft_ms_mean": 5.4535,
+  "t_verify_ms_mean": 19.8044,
+  "k_verify_over_draft": 3.6381,
+  "max_over_sum": 0.7844,
+  "A_stale_over_fresh": 0.598,
+  "go_window_on_k": [
+    0.672,
+    1.488
+  ],
+  "k_in_go_window": false,
+  "verdict_lag1_parallel": "NO-GO",
+  "note": "bs=1 regime (matches the accept-length run); bs>1 can shift the compute balance -> re-measure if the target deployment batches."
+}

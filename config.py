@@ -13,8 +13,11 @@ DRAFT_MODEL = "deepseek-ai/dspark_qwen3_4b_block7"
 # draft checkpoint (recommended; block7 => gamma=7).
 DSPARK_BLOCK_SIZE = None
 
-# --- the staleness knob (env var on the sglang decoupled-spec-e2e branch) ---
-LAG_ENV = "SGLANG_DSPARK_TARGET_HIDDEN_LAG_STEPS"
+# --- the staleness knob (env vars on the sglang dspark-stale-hidden-ablation branch) ---
+LAG_ENV = "SGLANG_DSPARK_TARGET_HIDDEN_LAG_STEPS"   # lag in rounds; 0 = vanilla
+# Variant-C frontier fill when lag>=1: "repeat" (last real hidden), "gap", "self_kv".
+STALE_FILL_ENV = "SGLANG_DSPARK_STALE_FILL_MODE"
+FILL_MODE = "repeat"
 
 # --- primary sweep (the headline: num_correct_drafts vs lag) ---
 LAGS = [0, 1, 2, 3]                      # lag=0 == vanilla; extend {4,6,8} if not flat

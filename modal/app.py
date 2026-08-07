@@ -113,3 +113,93 @@ def run_bench(gates_only: bool = False):
 def main(gates_only: bool = False):
     download_models.remote()
     run_bench.remote(gates_only=gates_only)
+
+
+@app.function(
+    image=image, gpu="A10G",
+    volumes={HF_CACHE: hf_vol, OUT_DIR: out_vol},
+    timeout=3600, memory=32768, max_containers=1,
+)
+def diag_plumbing():
+    import sys
+
+    sys.path.insert(0, "/root/harness")
+    from diag_plumbing import run_plumbing_check
+
+    try:
+        out = run_plumbing_check(results_dir=OUT_DIR)
+    finally:
+        out_vol.commit()
+    v = out["verdict"]
+    print(f"PLUMBING  baseline(lag0)={v['baseline']:.3f}  identity(lagBIG)={v['identity']:.3f}  "
+          f"diff={v['abs_diff']:.3f}  clean={v['plumbing_clean']}")
+
+
+@app.local_entrypoint()
+def diag():
+    # models + gsm8k already cached in the volume from the matrix run -> no download step.
+    diag_plumbing.remote()
+
+
+@app.function(
+    image=image, gpu="A10G",
+    volumes={HF_CACHE: hf_vol, OUT_DIR: out_vol},
+    timeout=2 * 3600, memory=32768, max_containers=1,
+)
+def diag_c_repeat(n: int = 0):
+    import sys
+
+    sys.path.insert(0, "/root/harness")
+    from diag_c import run_c_repeat
+
+    try:
+        res = run_c_repeat(results_dir=OUT_DIR, n=(n or None))
+    finally:
+        out_vol.commit()
+    for lag, v in res["compare"].items():
+        ai = v["variantA_ratio_incl"]
+        ai_str = f"{ai:.3f}" if ai is not None else "n/a"
+        print(f"{lag}: incl_ratio={v['C_repeat_ratio_incl']:.3f} (throughput)  "
+              f"excl_ratio={v['C_repeat_ratio_excl']:.3f}  (variantA_incl={ai_str})")
+
+
+@app.local_entrypoint()
+def crepeat(n: int = 0):
+    # C-repeat vs vanilla. n=0 -> config.N_PROMPTS; pass --n 2 for a cheap smoke first.
+    diag_c_repeat.remote(n=n)
+
+
+@app.function(
+    image=image, gpu="A10G",
+    volumes={HF_CACHE: hf_vol, OUT_DIR: out_vol},
+    timeout=1800, memory=32768, max_containers=1,
+)
+def diag_timing(n: int = 0):
+    import sys
+
+    sys.path.insert(0, "/root/harness")
+    from diag_timing import run_timing
+
+    try:
+        out = run_timing(results_dir=OUT_DIR, n=(n or None))
+    finally:
+        out_vol.commit()
+    print(
+        f"TIMING  t_draft={out['t_draft_ms_median']:.3f}ms  "
+        f"t_verify={out['t_verify_ms_median']:.3f}ms  "
+        f"k=t_v/t_d={out['k_verify_over_draft']:.3f}  (n={out['n_decode_steps_used']} steps)"
+    )
+    print(
+        f"        max/sum={out['max_over_sum']:.3f}  need {out['A_stale_over_fresh']:.3f} > this  "
+        f"-> lag1 parallel = {out['verdict_lag1_parallel']}"
+    )
+    print(
+        f"        GO window k in ({out['go_window_on_k'][0]:.2f}, "
+        f"{out['go_window_on_k'][1]:.2f});  k inside = {out['k_in_go_window']}"
+    )
+
+
+@app.local_entrypoint()
+def timing(n: int = 0):
+    # Measure t_draft / t_verify. Models + gsm8k already on the volume -> no download.
+    diag_timing.remote(n=n)
