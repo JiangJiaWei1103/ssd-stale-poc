@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="720" viewBox="0 0 720 720" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
+<rect width="720" height="720" fill="white"/>
+<text x="66" y="26" font-size="17" font-weight="700" fill="#111827">DSpark accept length vs staleness lag</text>
+<text x="66" y="44" font-size="12" fill="#6b7280">C-repeat &#183; N=64 &#183; gsm8k &#183; temp=0 &#183; lag=0 is vanilla</text>
+<line x1="66" y1="640.0" x2="562" y2="640.0" stroke="#e5e7eb"/>
+<text x="56" y="644.0" font-size="12" fill="#6b7280" text-anchor="end">0</text>
+<line x1="66" y1="533.5" x2="562" y2="533.5" stroke="#e5e7eb"/>
+<text x="56" y="537.5" font-size="12" fill="#6b7280" text-anchor="end">1</text>
+<line x1="66" y1="426.9" x2="562" y2="426.9" stroke="#e5e7eb"/>
+<text x="56" y="430.9" font-size="12" fill="#6b7280" text-anchor="end">2</text>
+<line x1="66" y1="320.4" x2="562" y2="320.4" stroke="#e5e7eb"/>
+<text x="56" y="324.4" font-size="12" fill="#6b7280" text-anchor="end">3</text>
+<line x1="66" y1="213.8" x2="562" y2="213.8" stroke="#e5e7eb"/>
+<text x="56" y="217.8" font-size="12" fill="#6b7280" text-anchor="end">4</text>
+<line x1="66" y1="107.3" x2="562" y2="107.3" stroke="#e5e7eb"/>
+<text x="56" y="111.3" font-size="12" fill="#6b7280" text-anchor="end">5</text>
+<line x1="66.0" y1="640" x2="66.0" y2="645" stroke="#6b7280"/>
+<text x="66.0" y="662" font-size="12" fill="#111827" text-anchor="middle">0</text>
+<line x1="231.3" y1="640" x2="231.3" y2="645" stroke="#6b7280"/>
+<text x="231.3" y="662" font-size="12" fill="#111827" text-anchor="middle">1</text>
+<line x1="396.7" y1="640" x2="396.7" y2="645" stroke="#6b7280"/>
+<text x="396.7" y="662" font-size="12" fill="#111827" text-anchor="middle">2</text>
+<line x1="562.0" y1="640" x2="562.0" y2="645" stroke="#6b7280"/>
+<text x="562.0" y="662" font-size="12" fill="#111827" text-anchor="middle">3</text>
+<text x="314" y="704" font-size="13" fill="#111827" text-anchor="middle">staleness lag (verifier rounds behind)</text>
+<text transform="translate(20,347) rotate(-90)" font-size="13" fill="#111827" text-anchor="middle">accept length (tokens / verify step)</text>
+<polyline points="66.0,131.2 231.3,335.7 396.7,421.2 562.0,452.2" fill="none" stroke="#2563eb" stroke-width="2.5"/>
+<circle cx="66.0" cy="131.2" r="4" fill="#2563eb"/>
+<text x="66.0" y="121.2" font-size="11.5" fill="#2563eb" text-anchor="middle" font-weight="600">4.78</text>
+<circle cx="231.3" cy="335.7" r="4" fill="#2563eb"/>
+<text x="231.3" y="325.7" font-size="11.5" fill="#2563eb" text-anchor="middle" font-weight="600">2.86</text>
+<circle cx="396.7" cy="421.2" r="4" fill="#2563eb"/>
+<text x="396.7" y="411.2" font-size="11.5" fill="#2563eb" text-anchor="middle" font-weight="600">2.05</text>
+<circle cx="562.0" cy="452.2" r="4" fill="#2563eb"/>
+<text x="562.0" y="442.2" font-size="11.5" fill="#2563eb" text-anchor="middle" font-weight="600">1.76</text>
+<polyline points="66.0,250.4 231.3,451.3 396.7,536.8 562.0,567.6" fill="none" stroke="#ea580c" stroke-width="2.5"/>
+<circle cx="66.0" cy="250.4" r="4" fill="#ea580c"/>
+<text x="66.0" y="268.4" font-size="11.5" fill="#ea580c" text-anchor="middle" font-weight="600">3.66</text>
+<circle cx="231.3" cy="451.3" r="4" fill="#ea580c"/>
+<text x="231.3" y="469.3" font-size="11.5" fill="#ea580c" text-anchor="middle" font-weight="600">1.77</text>
+<circle cx="396.7" cy="536.8" r="4" fill="#ea580c"/>
+<text x="396.7" y="554.8" font-size="11.5" fill="#ea580c" text-anchor="middle" font-weight="600">0.97</text>
+<circle cx="562.0" cy="567.6" r="4" fill="#ea580c"/>
+<text x="562.0" y="585.6" font-size="11.5" fill="#ea580c" text-anchor="middle" font-weight="600">0.68</text>
+<rect x="582" y="60" width="12" height="12" fill="#2563eb" rx="2"/>
+<text x="600" y="70" font-size="12" fill="#111827">accept_len</text>
+<text x="600" y="84" font-size="11" fill="#6b7280">(incl bonus,</text>
+<text x="600" y="97" font-size="11" fill="#6b7280">throughput)</text>
+<rect x="582" y="114" width="12" height="12" fill="#ea580c" rx="2"/>
+<text x="600" y="124" font-size="12" fill="#111827">correct_drafts</text>
+<text x="600" y="138" font-size="11" fill="#6b7280">(excl bonus,</text>
+<text x="600" y="151" font-size="11" fill="#6b7280">draft quality)</text>
+<text x="582" y="182" font-size="11.5" fill="#111827" font-weight="600">incl ratio vs lag0:</text>
+<text x="582" y="200" font-size="11" fill="#6b7280">lag0: 1.000</text>
+<text x="582" y="215" font-size="11" fill="#6b7280">lag1: 0.598</text>
+<text x="582" y="230" font-size="11" fill="#6b7280">lag2: 0.430</text>
+<text x="582" y="245" font-size="11" fill="#6b7280">lag3: 0.369</text>
+</svg>

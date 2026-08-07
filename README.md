@@ -38,22 +38,10 @@ eventually gets its real hidden.
 > space (A/B/C, RoPE phase, tail-fill, the peer's gap/self_kv) → [`docs/design-options.md`](docs/design-options.md).
 
 The harness is **synchronous vanilla DSpark** that *simulates* the lag by separating when a hidden
-is **computed** from when it's **used** (a per-request delay queue). `lag=0` is byte-identical vanilla.
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant D as Draft
-    participant V as Verify
-    participant Q as LagQueue (maxlen 2)
-    participant KV as Draft-KV pool
-    Note over D,KV: lag=1, steady state — round 6
-    KV->>D: draft reads — body real up to B4, B5 = HOLE (1 block)
-    V->>Q: COMPUTE h6 (on time) → queue; NOT used this round
-    Q->>KV: USE h5 (made last round) → BACKFILL @ B5 (real, own slot)
-    V->>KV: FILL repeat(last real) → B6  (placeholder = new 1-block hole)
-    Note over D,KV: hole width = lag; each hidden lands lag rounds after its own round
-```
+is **computed** from when it's **used** (a per-request delay queue): each round it emits the delayed
+**backfill** (the real hidden from `lag` rounds ago, written to its own slots) plus a **fill** for the
+current frontier hole. `lag=0` is byte-identical vanilla. Step-by-step timelines (harness ↔ real
+overlap, lag=1 vs lag=2) → [`docs/design-options.md`](docs/design-options.md).
 
 **Fill policies for the hole** (what the draft attends where the real hidden isn't ready yet):
 `repeat` = last real target hidden (implemented) · `gap` = empty (peer's) · `self_kv` = draft's own
@@ -65,6 +53,8 @@ differentiated arm, **not yet built**).
 ## Results
 
 ### 1 · Accept length vs staleness — C-repeat, N=64, gsm8k, temp=0
+
+![Accept length drops sharply with staleness lag](figs/accept_vs_lag.png)
 
 | lag | num_correct_drafts (excl bonus) | accept_len (incl bonus) | **incl ratio (throughput)** |
 |:---:|:---:|:---:|:---:|
